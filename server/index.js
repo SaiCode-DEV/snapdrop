@@ -286,4 +286,4 @@ Object.defineProperty(String.prototype, 'hashCode', {
   },
 })
 
-const server = new SnapdropServer(process.env.PORT || 3000)
+const server = new SnapdropServer(process.env.PORT || 3001)

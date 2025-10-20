@@ -83,6 +83,14 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 3000,
+    port: 5173,
+    proxy: {
+      // Proxy Snapdrop backend (HTTP + WebSocket) during development
+      '^/server(?:/.*)?$': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })
