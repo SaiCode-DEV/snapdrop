@@ -1,3 +1,4 @@
+const crypto = require('node:crypto')
 const process = require('node:process')
 // Handle SIGINT
 process.on('SIGINT', () => {
@@ -9,6 +10,19 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.info('SIGTERM Received, exiting...')
   process.exit(0)
+})
+// Handle APP ERRORS
+process.on('uncaughtException', (error, origin) => {
+  console.log('----- Uncaught exception -----')
+  console.log(error)
+  console.log('----- Exception origin -----')
+  console.log(origin)
+})
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('----- Unhandled Rejection at -----')
+  console.log(promise)
+  console.log('----- Reason -----')
+  console.log(reason)
 })
 
 const parser = require('ua-parser-js')
@@ -85,21 +99,28 @@ class SnapdropServer {
     // if room doesn't exist, create it
     if (!this._rooms[peer.ip]) {
       this._rooms[peer.ip] = {}
+      this._rooms[peer.ip][peer.id] = peer
+      return
     }
 
     // notify all other peers
     for (const otherPeerId in this._rooms[peer.ip]) {
       const otherPeer = this._rooms[peer.ip][otherPeerId]
-      this._send(otherPeer, {
-        type: 'peer-joined',
-        peer: peer.getInfo(),
-      })
+      if (otherPeer.id != peer.id) {
+        this._send(otherPeer, {
+          type: 'peer-joined',
+          peer: peer.getInfo(),
+        })
+      }
     }
 
     // notify peer about the other peers
     const otherPeers = []
     for (const otherPeerId in this._rooms[peer.ip]) {
-      otherPeers.push(this._rooms[peer.ip][otherPeerId].getInfo())
+      const otherPeer = this._rooms[peer.ip][otherPeerId]
+      if (otherPeer.id != peer.id) {
+        otherPeers.push(otherPeer.getInfo())
+      }
     }
 
     this._send(peer, {
@@ -141,7 +162,7 @@ class SnapdropServer {
       return
     }
     message = JSON.stringify(message)
-    peer.socket.send(message, error => '')
+    peer.socket.send(message, () => '')
   }
 
   _keepAlive (peer) {
@@ -187,15 +208,46 @@ class Peer {
   }
 
   _setIP (request) {
-    this.ip = request.headers['x-forwarded-for'] ? request.headers['x-forwarded-for'].split(/\s*,\s*/)[0] : request.connection.remoteAddress
+    // if (request.headers['x-forwarded-for']) {
+    //    this.ip = request.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
+    // } else {
+    //    this.ip = request.connection.remoteAddress;
+    // }
     // IPv4 and IPv6 use different values to refer to localhost
-    if (this.ip == '::1' || this.ip == '::ffff:127.0.0.1') {
-      this.ip = '127.0.0.1'
+    // if (this.ip == '::1' || this.ip == '::ffff:127.0.0.1') {
+    //    this.ip = '127.0.0.1';
+    // }
+    console.log('New connection', JSON.stringify(request))
+    if (/\?room=./.test(request.url)) {
+      this.ip = 'room-' + decodeURIComponent(request.url.match(/\?room=(.+)/i)[1])
+    } else {
+      const ipReg = /\w{0,4}[\.\:]\w{0,4}[\.\:]\w{0,4}[\.\:]\w{0,4}/
+      const xForwarded = request.headers['x-forwarded-for']
+      const cfip = request.headers['cf-connecting-ip']
+      if (cfip) {
+        this.ip = cfip
+      } else if (xForwarded) {
+        // console.log('x-forwarded-for:',request.headers['x-forwarded-for']);
+        // this.ip = request.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
+        this.ip = xForwarded
+      } else {
+        // console.log('connection.remoteAddress:',request.connection.remoteAddress);
+        this.ip = request.connection.remoteAddress
+      }
+      this.ip = ipReg.test(this.ip) ? this.ip.match(ipReg)[0] : this.ip.split(/\s*,\s*/)[0]
+      // IPv4 and IPv6 use different values to refer to localhost
+      if (this.ip == '::1' || this.ip == '::ffff:127.0.0.1') {
+        this.ip = 'local'
+      }
+    }
+    console.log('IP Address:', this.ip)
+    if (/^((192\.168\.)|fe80|(10\.)|(172\.16\.))/.test(this.ip)) {
+      this.ip = 'local'
     }
   }
 
   _setPeerId (request) {
-    this.id = request.peerId ? request.peerId : request.headers.cookie.replace('peerid=', '')
+    this.id = request.peerId || (request.headers && request.headers.cookie && request.headers.cookie.replace('peerid=', ''))
   }
 
   toString () {
@@ -243,34 +295,8 @@ class Peer {
     }
   }
 
-  // return uuid of form xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   static uuid () {
-    let uuid = '',
-      ii
-    for (ii = 0; ii < 32; ii += 1) {
-      switch (ii) {
-        case 8:
-        case 20: {
-          uuid += '-'
-          uuid += (Math.random() * 16 | 0).toString(16)
-          break
-        }
-        case 12: {
-          uuid += '-'
-          uuid += '4'
-          break
-        }
-        case 16: {
-          uuid += '-'
-          uuid += (Math.random() * 4 | 8).toString(16)
-          break
-        }
-        default: {
-          uuid += (Math.random() * 16 | 0).toString(16)
-        }
-      }
-    }
-    return uuid
+    return crypto.randomUUID()
   };
 }
 

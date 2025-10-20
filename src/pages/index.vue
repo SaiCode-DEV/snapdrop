@@ -347,10 +347,15 @@
 
   // Background animation
   function setupBackgroundAnimation () {
+    const existingCanvas = document.querySelector('#background-canvas') as HTMLCanvasElement | null
+    if (existingCanvas) return
+
     const c = document.createElement('canvas')
+    c.id = 'background-canvas'
     document.body.append(c)
     const style = c.style as CSSStyleDeclaration
     style.width = '100%'
+    style.zIndex = '-1'
     style.position = 'absolute'
     style.top = '0'
     style.left = '0'
@@ -444,3 +449,13 @@
     window.removeEventListener('paste', onPaste)
   })
 </script>
+
+<style>
+body {
+  background: rgb(var(--v-theme-background));
+}
+
+.v-application {
+  background: none;
+}
+</style>
