@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.7",
+    "@forward-software/qrcodets": "^1.0.0",
     "@mdi/font": "7.4.47",
     "pinia": "^3.0.3",
     "vue": "^3.5.21",

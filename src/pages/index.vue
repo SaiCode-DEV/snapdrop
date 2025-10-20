@@ -63,8 +63,8 @@
       </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="d-flex flex-column align-center mt-auto mb-6 text-center">
+    <!-- Footer (click to open Join/QR dialog) -->
+    <footer class="d-flex flex-column align-center mt-auto mb-6 text-center" @click="openJoinRoom" style="cursor: pointer;">
       <svg class="icon logo">
         <symbol id="wifi-tethering" viewBox="0 0 24 24">
           <path d="M12 11c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 2c0-3.31-2.69-6-6-6s-6 2.69-6 6c0 2.22 1.21 4.15 3 5.19l1-1.74c-1.19-.7-2-1.97-2-3.45 0-2.21 1.79-4 4-4s4 1.79 4 4c0 1.48-.81 2.75-2 3.45l1 1.74c1.79-1.04 3-2.97 3-5.19zM12 3C6.48 3 2 7.48 2 13c0 3.7 2.01 6.92 4.99 8.65l1-1.73C5.61 18.53 4 15.96 4 13c0-4.42 3.58-8 8-8s8 3.58 8 8c0 2.96-1.61 5.53-4 6.92l1 1.73c2.99-1.73 5-4.95 5-8.65 0-5.52-4.48-10-10-10z" />
@@ -127,6 +127,30 @@
       </v-card>
     </v-dialog>
 
+    <!-- Join Room Dialog ( + QR) -->
+    <v-dialog v-model="joinRoomDialog.show" max-width="560">
+      <v-card tag="form" @submit.prevent="submitJoinRoom">
+        <v-card-title>Join or Share Room</v-card-title>
+        <v-card-text>
+          <div class="mb-4 d-flex justify-center">
+            <div ref="qrContainer" style="width: 240px; height: 240px;" />
+          </div>
+          <v-text-field
+            v-model="joinRoomDialog.room"
+            label="Room ID"
+            autocomplete="off"
+            clearable
+            autofocus
+          />
+          <div class="text-caption text-medium-emphasis">Click footer to reopen this dialog.</div>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="joinRoomDialog.show = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" type="submit">Join</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Receive text dialog -->
     <v-dialog v-model="receiveTextDialog.show" max-width="520">
       <v-card>
@@ -150,7 +174,8 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+  import { QRCode, SVGRenderer as SVG } from '@forward-software/qrcodets'
+  import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
   import { PeersManager, ServerConnection } from '@/scripts/network.js'
 
   import '@/styles/legacy.css'
@@ -188,6 +213,14 @@
     show: false,
     text: '' as string,
   })
+
+  // Join/Room QR dialog state
+  const joinRoomDialog = reactive({
+    show: false,
+    room: '' as string,
+  })
+  const qrContainer = ref<HTMLElement | null>(null)
+  let qrCodeInstance: QRCode | null = null
 
   // Helpers
   function isURL (text?: string) {
@@ -331,6 +364,40 @@
     snackbar.show = true
   }
 
+  // Join/QR helpers
+  function currentRoomUrl () {
+    const room = joinRoomDialog.room.trim()
+    const base = `${location.protocol}//${location.host}`
+    return room ? `${base}?room=${encodeURIComponent(room)}` : base
+  }
+  function renderQr () {
+    const container = qrContainer.value
+    if (!container) return
+    container.innerHTML = ''
+    try {
+      qrCodeInstance = new QRCode(currentRoomUrl(), {
+        type: 4,
+        correctionLevel: 'Q',
+        size: 240,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+      })
+      qrCodeInstance.renderTo(SVG(container))
+    } catch {
+      console.error('Failed to render QR code')
+      // remove last character
+      joinRoomDialog.room = joinRoomDialog.room.slice(0, -1)
+    }
+  }
+  function openJoinRoom () {
+    joinRoomDialog.show = true
+    nextTick(() => renderQr())
+  }
+  function submitJoinRoom () {
+    window.location.href = currentRoomUrl()
+  }
+  watch(() => joinRoomDialog.room, () => renderQr())
+
   // Paste handler (send pasted image to the only peer)
   function onPaste (e: ClipboardEvent) {
     const items = e.clipboardData?.items
@@ -415,6 +482,12 @@
   }
 
   onMounted(() => {
+    // Prefill room from URL
+    try {
+      const params = new URLSearchParams(location.search)
+      const room = params.get('room')
+      joinRoomDialog.room = room ? decodeURIComponent(room) : crypto.randomUUID().split('-')[0]
+    } catch {}
     // Init network stack
     server = new ServerConnection()
     _peersManager = new PeersManager(server)
@@ -452,7 +525,7 @@
 
 <style>
 body {
-  background: rgb(var(--v-theme-background));
+  background-color: rgb(var(--v-theme-background)) !important;
 }
 
 .v-application {

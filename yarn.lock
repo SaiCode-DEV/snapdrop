@@ -281,6 +281,11 @@
   resolved "https://registry.yarnpkg.com/@fontsource/roboto/-/roboto-5.2.7.tgz#4c8e06c6abf17bc6c18cd8b1ce26112803346c9c"
   integrity sha512-fca6Jtyxn6kPR51+TTTMCFm0FOhnKaLEYYiAQc8P/4iFCKoKGR0aX89QR4CfP+N64RPXJus64UxhJaVENnSM6Q==
 
+"@forward-software/qrcodets@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@forward-software/qrcodets/-/qrcodets-1.0.0.tgz#a18786ab6f28e6b559265a8b26db2cb75a982bd3"
+  integrity sha512-qmNUlqxDFL4Uk+feNYppgzrcAIu9pj1wNGt4L/icAGO8efJ/ah2qCyr6K2a3Qp7LBVKpQAQBSG6V9OPD6+IEBg==
+
 "@humanfs/core@^0.19.1":
   version "0.19.1"
   resolved "https://registry.yarnpkg.com/@humanfs/core/-/core-0.19.1.tgz#17c55ca7d426733fe3c561906b8173c336b40a77"
